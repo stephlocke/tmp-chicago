@@ -1,0 +1,28 @@
+---
+title: "Chicago Food Inspections"
+output: html_notebook
+---
+
+```{r setup}
+library(readr)
+library(dplyr)
+
+
+
+readrestaurant<-function(x){
+  foodinspectioncols<-c(
+      "InspectionID",	"DBAName",	"AKAName",	"LicenseID",	"FacilityType", "Risk"
+      , "Address",	"City",	"State",	"Zip"
+      , "InspectionDate","InspectionType",	"InspectionResults", "InspectionNotes"
+      ,	"Latitude",	"Longitude", "LatLong"
+      )
+  read_csv(x
+           , col_names = foodinspectioncols
+           , col_types = cols("InspectionDate"=col_date(format = "%m/%d/%Y"))
+           )
+}
+p1<-readrestaurant("../Food_Inspections1.csv")
+p2<-readrestaurant("../Food_Inspections2.csv")
+
+inspections<-union(p1,p2)
+```
