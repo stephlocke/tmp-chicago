@@ -149,17 +149,13 @@ inspections %>%
 ```{r}
 library(stringr)
 inspections %>%
-  transmute(InspectionID, tempInspectionType= word(str_to_lower(InspectionType),sep = " |/|-")) %>%
-  mutate(total=n()) %>%
-  group_by(tempInspectionType) %>%
-  mutate(InspectionID, RefinedInspectionType=ifelse(n()>250,tempInspectionType,"Other")) %>%
-  ungroup %>%
-  select(-tempInspectionType, -total) ->
-  inspectiontypes
-
-inspections %>%
-  left_join(inspectiontypes, by="InspectionID") ->
+  mutate(RefinedInspectionType = str_to_lower(InspectionType)) %>%
+  mutate(RefinedInspectionType = word(RefinedInspectionType, 1, sep = " |-|/")) %>%
+  mutate(RefinedInspectionType = fct_infreq(RefinedInspectionType)) %>%
+  mutate(RefinedInspectionType = fct_lump(RefinedInspectionType, prop=.05)) %>%
+  mutate(RefinedInspectionType = fct_collapse(RefinedInspectionType, complaint="short")) ->
   inspections
+
 ```
 
 ```{r}
