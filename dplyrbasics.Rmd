@@ -1,0 +1,190 @@
+---
+title: "dplyr"
+output:
+  html_notebook:
+    theme: flatly
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+```
+
+# Filtering
+
+## Conditions
+```{r}
+iris %>%
+  filter(Species == "setosa") %>%
+  filter(Petal.Length < 1.4)
+```
+
+## Positions
+```{r}
+iris %>%
+  slice(which.max(Sepal.Length)) 
+```
+
+# Column manipulation
+
+## Selection
+### Basic
+```{r}
+iris %>%
+  select(Sepal.Length, Sepal.Width, Species)
+```
+
+### Negative selection
+```{r}
+iris %>%
+  select(-Sepal.Length, -Sepal.Width)
+```
+
+### Regex type selections
+```{r}
+iris %>%
+  select(starts_with("S"))
+```
+
+## Aliasing
+
+```{r}
+iris %>%
+  rename(sepal_length = Sepal.Length, sepal_width = Sepal.Width) %>%
+  head
+```
+
+## Bulk renaming
+```{r}
+iris %>%
+  rename_(.dots=setNames(names(.), tolower(gsub("\\.", "_", names(.)))))
+```
+
+## New columns
+
+```{r}
+iris %>%
+  mutate(Sepal.Area= Sepal.Length*Sepal.Width)
+```
+
+# Aggregations
+
+## Overall
+```{r}
+iris %>%
+  summarise(mean_sepal_length=mean(Sepal.Length),
+            n=n())
+```
+
+## Groupings
+```{r}
+iris %>%
+  group_by(Species )%>%
+  summarise(mean_sepal_length=mean(Sepal.Length),
+            n=n())
+```
+
+# Table ops
+## Sorting
+```{r}
+iris %>%
+  arrange(desc(Sepal.Length))
+```
+
+## Sampling
+```{r}
+iris %>% 
+  sample_n(2)
+```
+
+# Joins
+
+```{r}
+irisLookup<-data.frame( Species = c("Other","setosa","virginica") ,
+                        Property = c(1,1,2)
+                      )
+```
+
+## Basic joins
+### Left
+```{r, warning=FALSE}
+iris %>%
+  left_join(irisLookup) %>%
+  group_by(Species) %>%
+  summarise(N=n(),
+            RHS_NAs = sum(is.na(Property)))
+```
+
+### Inner
+```{r, warning=FALSE}
+iris %>%
+  inner_join(irisLookup) %>%
+  group_by(Species) %>%
+  summarise(N=n(),
+            RHS_NAs = sum(is.na(Property)))
+```
+
+### Full join
+```{r, warning=FALSE}
+iris %>%
+  full_join(irisLookup) %>%
+  group_by(Species) %>%
+  summarise(N=n(),
+            RHS_NAs = sum(is.na(Property)))
+```
+
+### Anti-join
+```{r, warning=FALSE}
+iris %>%
+  anti_join(irisLookup) %>%
+  group_by(Species) %>%
+  summarise(N=n())
+```
+
+### Semi-join
+```{r, warning=FALSE}
+iris %>%
+  semi_join(irisLookup) %>%
+  group_by(Species) %>%
+  summarise(N=n())
+```
+
+## Complex joins
+
+### Different names
+```{r, warning=FALSE}
+irisLookup<-data.frame( species = c("Other","setosa","virginica") ,
+                        Property = c(1,1,2)
+                      )
+
+iris %>%
+  inner_join(irisLookup, by= c("Species"="species")) %>%
+  group_by(Species) %>%
+  summarise(N=n(),
+            RHS_NAs = sum(is.na(Property)))
+```
+
+### Compound keys
+```{r, warning=FALSE}
+irisLookup<-data.frame( Species = c("Other","setosa","virginica") ,
+                        Sepal.Length = c(5.9, 4.9, 4.7)
+                      )
+
+iris %>%
+  inner_join(irisLookup, by= c("Species","Sepal.Length")) %>%
+  group_by(Species) %>%
+  summarise(N=n())
+```
+
+### Calculated values
+```{r, warning=FALSE}
+irisLookup<-data.frame( Species = c("Other","setosa","virginica") ,
+                        Sepal.Length = c("Large","Large","Small")
+                      )
+
+iris %>%
+  mutate(Sepal.Bracket = ifelse(Sepal.Length>mean(Sepal.Length), "Large", "Small")) %>%
+  inner_join(irisLookup, by= c("Species","Sepal.Bracket"="Sepal.Length")) %>%
+  group_by(Species) %>%
+  summarise(N=n())
+```

@@ -1,0 +1,55 @@
+---
+title: "dplyr exercises"
+output: html_notebook
+---
+
+# Exercise 1
+Load dplyr, add the row names as a column in the data frame
+```{r}
+library(dplyr)
+mtcars %>%
+  mutate(makenmodel = row.names(mtcars)) ->
+  newmtcars
+
+identical(mtcars, newmtcars)
+```
+
+# Exercise 2
+Identify the average mpg by number of cylinders
+```{r}
+newmtcars %>%
+  group_by(cyl) %>%
+  summarise(mean_mpg = mean(mpg))
+```
+
+# Exercise 3
+Find the top 10 cars by horsepower 
+```{r}
+newmtcars %>%
+  arrange(desc(hp)) %>%
+  head(10)
+```
+
+# Exercise 4
+Do a linear regression of mpg by some columns
+```{r}
+newmtcars %>%
+  lm(mpg~cyl+hp+wt, data= . )
+```
+
+# Exercise 5
+Are there any gas-guzzling 4-cylinder cars? i.e. how many cars have *lower* than average mpg but have only 4 cylinders
+
+```{r}
+newmtcars %>% 
+  filter( mpg < mean(mpg)) %>%
+  filter( cyl==4 )
+```
+
+
+
+
+
+
+
+

@@ -1,0 +1,71 @@
+---
+title: "forcats basics"
+output: html_notebook
+---
+
+Categorical variables can be hard in R because of the nature of factors and the disparity in available functions. forcats resolves a lot of the problems.
+
+```{r}
+library(dplyr)
+library(forcats)
+```
+s
+# Basics
+
+```{r}
+# replace as.factor with as_factor for consistent results
+vec<-sample(LETTERS,5)
+vec
+as_factor(vec)
+as.factor(vec)
+```
+
+```{r}
+# Combine factor vectors with differing levels
+vec1<-as_factor(sample(LETTERS[1:20],10,replace = TRUE))
+vec2<-as_factor(sample(LETTERS[1:20],10,replace = TRUE))
+fct_c(vec1,vec2)
+```
+
+```{r}
+# Add levels (like ones missing in training data!)
+vec3<-fct_expand(vec2, levels(vec1)[1:3])
+vec3
+```
+
+```{r}
+# Do some cleanup
+vec4<-fct_drop(vec3)
+vec4
+```
+
+# Sensible orders
+```{r}
+vec5<-fct_c(vec1,vec2)
+vec5
+fct_infreq(vec5)
+fct_rev(vec5)
+fct_shift(vec5)
+fct_shuffle(vec5)
+fct_inorder(vec5)
+```
+
+# Groupings
+```{r}
+fct_lump(vec5,n = 2)
+```
+
+```{r}
+vec6<-vec5
+vec6[3]<-NA
+vec6
+fct_explicit_na(vec6)
+```
+
+# Manual intervention
+```{r}
+vec5
+fct_other(vec5, keep=vec5[1:5])
+fct_recode(vec5, chng="A")
+fct_relevel(vec5,"A","B","C")
+```

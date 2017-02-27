@@ -1,0 +1,64 @@
+---
+title: "Forcats exercises"
+output: html_notebook
+---
+
+```{r}
+library(dplyr)
+library(forcats)
+```
+
+# Exercise 1
+Using the gss_cat data, explore the partyid field and produce a consolidated factor that makes sense to you
+```{r}
+fct_count(gss_cat$partyid)
+```
+```{r}
+gss_cat %>%
+  mutate(newpartyid = fct_lump(partyid)) %>%
+  mutate(newpartyid = fct_collapse(newpartyid, republican="Strong republican", republican="Not str republican")) %>%
+  group_by(newpartyid) %>%
+  summarise(n())
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+gss_cat %>%
+  mutate(revisedpartyid = fct_lump(partyid)) %>%
+  group_by(revisedpartyid) %>%
+  summarise(n=n())
+```
+
+# Exercise 2
+We're doing some modelling and we're least interested in the most common classes for different factors. Change all factors to account for this. Hint: `mutate_if()`
+
+```{r}
+gss_cat %>%
+  mutate_if(is.factor, fct_infreq) %>%
+  group_by(marital) %>%
+  summarise(n=n())
+  
+```
+
+
+
+
+
+
+
+
+```{r}
+fct_count(gss_cat$marital)
+gss_cat %>%
+  mutate_if(is.factor, fct_infreq) ->
+  gss_cat_releveled
+fct_count(gss_cat_releveled$marital)
+```
