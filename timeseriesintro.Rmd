@@ -1,0 +1,174 @@
+---
+title: "Time Series basics"
+output: html_notebook
+---
+
+# Time series packages
+
+- **stats** base R functionality
+    + `ts()`
+- **forecast** forecasting functionality
+- **zoo** and **xts** improved time series manipulations
+- **ggseas** ggplot2 time series
+- **fpp** practice datasets
+
+Get all (good) time series packages via the CRAN task view:
+
+```r
+library(ctv)
+install.views("TimeSeries")
+```
+
+```{r}
+library(forecast)
+library(zoo)
+library(ggseas)
+library(ggplot2)
+library(fpp)
+```
+
+# Time series fundamentals
+
+## Making time series
+Time series need:
+- **values** the thing being measured
+- **interval** typically this is constant
+- **frequency** number of records in a cycle
+
+### From vector
+```{r}
+kings <- scan("http://robjhyndman.com/tsdldata/misc/kings.dat",skip=3)
+ts(kings)
+```
+
+### From data.frame
+```{r}
+sample_df<-data.frame(l=seq(Sys.Date(),by = 1, length.out = 26), r=rnorm(26))
+smpts<-zoo(sample_df$r,order.by = sample_df$l)
+smpts
+```
+
+## Basic plotting
+
+### Base R
+```{r}
+plot(ts(kings))
+```
+
+### ggplot2
+```{r}
+# via forecast funcction autpolot
+autoplot(smpts)
+```
+
+## Decomposition
+```{r}
+# via ggseas
+ggsdc(tsdf(usconsumption), aes(x=x, y=consumption), s.window=4)+geom_line()
+```
+
+# Moving averages
+Use moving averages to remove noise from a timeseries
+
+```{r}
+cons<-zoo(usconsumption)
+zmean<-rollmean(cons,k=4)
+zmedian<-rollmedian(cons,k=4)
+results<-merge(merge(cons,zmean),zmedian)
+autoplot(results)
+```
+
+# Smoothing
+Build a curve that can be extended for forecasts
+
+```{r}
+etscons<-ets(cons$consumption)
+autoplot(etscons)
+```
+
+```{r}
+forecons<-forecast(etscons, h=4)
+autoplot(forecons)
+```
+
+```{r}
+accuracy(forecons)
+```
+
+# ARIMA
+Take into account correlations between succesive values of a stationary time series.
+
+>Use the log of a timeseries if it's multiplicative or take a diff between successive values
+
+```{r}
+diffs<-diff(cons)
+consanddiffs<-merge(cons,diffs)
+autoplot(consanddiffs)
+```
+
+```{r}
+acf(diffs)
+```
+
+```{r}
+pacf(diffs)
+```
+
+[auto.arima alogirithm](https://www.otexts.org/fpp/8/7)
+```{r}
+diffsarima<-auto.arima(diffs$consumption)
+diffsarima
+```
+
+```{r}
+autoplot(forecast(diffsarima,h=4))
+```
+
+```{r}
+consarima<-auto.arima(cons$consumption)
+consarima
+```
+
+```{r}
+autoplot(forecast(consarima,h=4))
+```
+
+```{r}
+autoplot(consarima)
+```
+
+```{r}
+accuracy(consarima)
+```
+
+# Regression forecasts
+For a multivariate forecast
+
+```{r}
+autoplot(cons)
+qplot(cons$income, cons$consumption)
+```
+
+```{r}
+lmusc <- tslm(consumption ~ income, data=usconsumption)
+
+qplot(cons$income, cons$consumption) + geom_abline(intercept=coef(lmusc)[1],slope=coef(lmusc)[2])
+```
+
+```{r}
+scenarios<-forecast(lmusc, newdata=data.frame(income=-1:1))
+
+autoplot(scenarios)
+```
+
+```{r}
+autoplot(ts(resid(lmusc)))
+```
+
+```{r}
+Acf(ts(resid(lmusc)))
+```
+
+```{r}
+accuracy(lmusc)
+```

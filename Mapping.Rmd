@@ -1,0 +1,70 @@
+---
+title: "Mapping"
+output: html_notebook
+---
+
+```{r setup}
+library(readr)
+library(dplyr)
+
+readrestaurant<-function(x){
+  foodinspectioncols<-c(
+      "InspectionID",	"DBAName",	"AKAName",	"LicenseID",	"FacilityType", "Risk"
+      , "Address",	"City",	"State",	"Zip"
+      , "InspectionDate","InspectionType",	"InspectionResults", "InspectionNotes"
+      ,	"Latitude",	"Longitude", "LatLong"
+      )
+  read_csv(x
+           , col_names = foodinspectioncols
+           , col_types = cols("InspectionDate"=col_date(format = "%m/%d/%Y"))
+           )
+}
+p1<-readrestaurant("../FoodInspection/Food_Inspections1.csv")
+p2<-readrestaurant("../FoodInspection/Food_Inspections2.csv")
+
+inspections<-dplyr::union(p1,p2)
+```
+
+# ggmap
+```{r}
+library(ggmap)
+ggmap(get_map(location = 'Chicago', zoom = 11)) +
+  geom_point(data=inspections, aes(x=Longitude, y=Latitude, colour=InspectionResults), alpha=.2)
+```
+
+```{r}
+ggmap(get_map(location = 'Chicago', zoom = 11)) +
+  geom_density2d(data=inspections[inspections$InspectionResults=="Fail",], aes(x=Longitude, y=Latitude))
+```
+
+```{r}
+ggmap(get_map(location="chicago", zoom=11))+
+  geom_density2d(data=inspections, aes(x=Longitude, y=Latitude))+
+  facet_wrap(~InspectionResults, ncol=3)
+```
+
+# ggmap geocode
+```{r}
+geocode("Cardiff, UK")
+```
+
+# Leaflet
+```{r}
+library(leaflet)
+factpal <- colorFactor(topo.colors(5), inspections$FacilityType)
+
+inspections %>%
+  leaflet %>%
+  addTiles() %>%
+  addCircles(lng=~Longitude, lat=~Latitude, color=~factpal(FacilityType),
+             popup=~FacilityType, radius=1, opacity = .2) %>%
+  addLegend(position = "bottomright", values=~FacilityType, pal = factpal)
+```
+
+# Grids
+
+```{r}
+
+inspections %>%
+  mutate(GridLatitude = round(Latitude,1))
+```
