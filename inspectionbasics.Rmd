@@ -1,0 +1,271 @@
+---
+title: "Chicago Food Inspections"
+output: html_notebook
+---
+
+```{r setup}
+library(readr)
+library(dplyr)
+
+
+
+readrestaurant<-function(x){
+  foodinspectioncols<-c(
+      "InspectionID",	"DBAName",	"AKAName",	"LicenseID",	"FacilityType", "Risk"
+      , "Address",	"City",	"State",	"Zip"
+      , "InspectionDate","InspectionType",	"InspectionResults", "InspectionNotes"
+      ,	"Latitude",	"Longitude", "LatLong"
+      )
+  read_csv(x
+           , col_names = foodinspectioncols
+           , col_types = cols("InspectionDate"=col_date(format = "%m/%d/%Y"))
+           )
+}
+p1<-readrestaurant("../FoodInspection/Food_Inspections1.csv")
+p2<-readrestaurant("../FoodInspection/Food_Inspections2.csv")
+
+inspections<-union(p1,p2)
+```
+
+# Data exploration
+```{r}
+inspections %>%
+  summary
+```
+
+
+## Handling potential factors
+
+```{r}
+inspections %>%
+  select_if(is.character) %>%
+  summarise_each(funs(uniqueN=n_distinct))
+```
+
+### Facility Type
+```{r}
+inspections$FacilityType<-tolower(inspections$FacilityType)
+(inspections %>%
+   mutate(total=n()) %>%
+   group_by(FacilityType) %>%
+   summarise(N=n(), total=min(total)) %>%
+   mutate(P=N/total) %>%
+   arrange(desc(N)) %>%
+   filter(!is.na(FacilityType))->
+   facilities)
+```
+
+Perhaps we can combine these? Instead of doing it manually, perhaps we can do some sort of fuzzy grouping?
+
+```{r}
+library(stringdist)
+library(forcats)
+distances <- stringdistmatrix(facilities$FacilityType, facilities$FacilityType)
+weightings <- 10^facilities$P
+weighteddistances <- distances / weightings
+diag(weighteddistances) <- 9999999
+matches <- apply(weighteddistances,2, which.min)
+facilities %>%
+  mutate(NextClosest= FacilityType[matches]) %>%
+  mutate(Group= ifelse(P>=0.05,FacilityType,NextClosest)) ->
+  facilities
+
+facilities
+```
+
+Looking at the revised groups
+```{r}
+facilities %>%
+  group_by(Group) %>%
+  summarise(N=sum(N)) %>%
+  arrange(desc(N)) ->
+  groupedfacilities
+
+groupedfacilities
+```
+
+There's still a long tail but it's much better! Let's apply these new values
+
+```{r}
+inspections %>%
+  left_join(facilities) %>%
+  select(-N, -P, -total, -NextClosest, RefinedFacilityType=Group) %>%
+  mutate(RefinedFacilityType=factor(RefinedFacilityType)) ->
+  inspections
+
+inspections %>%
+  group_by(RefinedFacilityType) %>%
+  summarise(N=n())
+```
+
+We can then use forcats to consolidate the long tail
+```{r}
+inspections %>%
+  mutate(RefinedFacilityType= fct_lump(RefinedFacilityType, prop=0.01)) ->
+  inspections
+```
+
+### Risk
+```{r}
+inspections %>%
+  group_by(Risk) %>%
+  summarise(N=n())
+```
+
+```{r}
+inspections %>%
+  mutate(Risk = ordered(Risk, levels = c("Risk 3 (Low)", "Risk 2 (Medium)","Risk 1 (High)"), labels = c("L", "M","H"))) ->
+  inspections
+```
+
+### City
+```{r}
+inspections %>%
+  group_by(City) %>%
+  summarise(N=n())
+```
+
+This doesn't look like a field of interest. Let's quickly check state too.
+
+```{r}
+inspections %>%
+  group_by(State) %>%
+  summarise(N=n())
+```
+One missing, and as expected Chicago is in Illinois!
+
+### Inspection Types
+
+```{r}
+inspections %>%
+  group_by(InspectionType) %>%
+  summarise(N=n())
+```
+
+```{r}
+library(stringr)
+inspections %>%
+  transmute(InspectionID, tempInspectionType= word(str_to_lower(InspectionType),sep = " |/|-")) %>%
+  mutate(total=n()) %>%
+  group_by(tempInspectionType) %>%
+  mutate(InspectionID, RefinedInspectionType=ifelse(n()>250,tempInspectionType,"Other")) %>%
+  ungroup %>%
+  select(-tempInspectionType, -total) ->
+  inspectiontypes
+
+inspections %>%
+  left_join(inspectiontypes, by="InspectionID") ->
+  inspections
+```
+
+```{r}
+inspections %>%
+  group_by(RefinedInspectionType) %>%
+  summarise(N=n())
+```
+
+
+### Pass
+```{r}
+inspections %>%
+  group_by(InspectionResults) %>%
+  summarise(N=n())
+```
+
+```{r}
+inspections %>%
+  mutate(RefinedInspectionResults = fct_collapse(
+    InspectionResults, Other = c("Business Not Located","Out of Business"))) ->
+  inspections
+```
+
+```{r}
+inspections %>%
+  group_by(RefinedInspectionResults) %>%
+  summarise(N=n())
+```
+
+### Inspection notes
+```{r}
+inspections %>%
+  select(InspectionNotes) %>%
+  head
+```
+
+It looks like we could be able to split these out by the pipe(`|`) symbol. 
+
+```{r}
+library(data.table)
+library(dtplyr)
+
+inspections %>%
+  select(InspectionID, InspectionNotes) %>%
+  tbl_dt -> 
+  notes
+
+notes<-cbind(notes, notes[,tstrsplit(InspectionNotes,split=" | ", fixed=TRUE)])
+
+notes %>%
+  melt(id.var=c("InspectionID"), na.rm=TRUE) %>%
+  select(-variable) %>%
+  mutate(note = as.numeric(word(value,sep = fixed(".")))) ->
+  notespivot
+
+inspections %>%
+  tbl_dt %>%
+  full_join(notespivot) ->
+  notesinspections
+```
+
+```{r}
+notesinspections %>%
+  group_by(note, RefinedInspectionResults) %>%
+  summarise (N=n()) ->
+  notefrequencies
+```
+
+```{r}
+library(ggplot2)
+ggplot(notefrequencies, aes(x=note, y=N
+                            , group=RefinedInspectionResults
+                            , fill=RefinedInspectionResults)) +
+  geom_col()
+```
+
+```{r}
+ggplot(notefrequencies, aes(x=note, y=N
+                            , group=RefinedInspectionResults
+                            , fill=RefinedInspectionResults)) +
+  geom_col(position="fill")
+```
+
+# Pass rates
+
+## By Facility Type
+
+```{r}
+library(ggplot2)
+
+ggplot(inspections,aes(x=RefinedFacilityType, group=RefinedInspectionResults, fill=RefinedInspectionResults))+
+  geom_bar()+ coord_flip()
+```
+
+## By Inspection Type
+
+```{r}
+ggplot(inspections,aes(x=RefinedInspectionType, group=RefinedInspectionResults, fill=RefinedInspectionResults))+
+  geom_bar()+ coord_flip()
+```
+
+# Geography
+```{r}
+library(ggmap)
+ggmap(get_map(location = 'Chicago', zoom = 11)) +
+  geom_point(data=inspections, aes(x=Longitude, y=Latitude, colour=RefinedInspectionResults), alpha=.2)
+```
+
+```{r}
+library(ggmap)
+ggmap(get_map(location = 'Chicago', zoom = 11)) +
+  geom_density2d(data=inspections, aes(x=Longitude, y=Latitude, colour=RefinedInspectionResults))
+```
