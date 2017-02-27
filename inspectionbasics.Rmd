@@ -61,16 +61,20 @@ Perhaps we can combine these? Instead of doing it manually, perhaps we can do so
 library(stringdist)
 library(forcats)
 distances <- stringdistmatrix(facilities$FacilityType, facilities$FacilityType)
-weightings <- 10^facilities$P
+distances[1:10,1:10]
+weightings <- 10^facilities$P#1#log(facilities$N+1)
+weightings[1:10]
 weighteddistances <- distances / weightings
+weighteddistances[c(1,60),c(1,60)]
 diag(weighteddistances) <- 9999999
 matches <- apply(weighteddistances,2, which.min)
+matches[1:10]
 facilities %>%
   mutate(NextClosest= FacilityType[matches]) %>%
   mutate(Group= ifelse(P>=0.05,FacilityType,NextClosest)) ->
   facilities
 
-facilities
+t(facilities[1:7,])
 ```
 
 Looking at the revised groups
@@ -197,22 +201,24 @@ It looks like we could be able to split these out by the pipe(`|`) symbol.
 ```{r}
 library(data.table)
 library(dtplyr)
+library(dplyr)
 
 inspections %>%
   select(InspectionID, InspectionNotes) %>%
-  tbl_dt -> 
+  setDT -> 
   notes
 
 notes<-cbind(notes, notes[,tstrsplit(InspectionNotes,split=" | ", fixed=TRUE)])
 
 notes %>%
+  select(-InspectionNotes) %>%
   melt(id.var=c("InspectionID"), na.rm=TRUE) %>%
   select(-variable) %>%
   mutate(note = as.numeric(word(value,sep = fixed(".")))) ->
   notespivot
 
 inspections %>%
-  tbl_dt %>%
+  setDT %>%
   full_join(notespivot) ->
   notesinspections
 ```
@@ -222,6 +228,9 @@ notesinspections %>%
   group_by(note, RefinedInspectionResults) %>%
   summarise (N=n()) ->
   notefrequencies
+
+notefrequencies[note==30,]
+notespivot[note==30,]
 ```
 
 ```{r}
