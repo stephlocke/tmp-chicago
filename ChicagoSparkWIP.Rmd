@@ -1,0 +1,75 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(sparklyr)
+library(dplyr)
+library(data.table)
+library(dtplyr)
+sc <- spark_connect(master = "local")
+```
+
+```{r}
+dat <- readRDS("DATA/dat_model.Rds")
+dat[,Inspection_Date:=as.Date(Inspection_Date)]
+datdt<- copy_to(sc, dat, "chicago", overwrite=TRUE)
+```
+
+```{r}
+datdt %>%
+    filter(LICENSE_DESCRIPTION == "Retail Food Establishment") %>%
+    copy_to(sc,.,"chicago", overwrite=TRUE)
+```
+
+```{r}
+datdt
+```
+```{r}
+sumNAs<-function(x){sum(is.na(x))}
+ datdt %>%
+    collect %>%
+    summarise_each(funs(sumNAs)) %>%
+    t
+```
+
+```{r}
+datdt %>%
+   mutate(Inspector_Assigned = ifelse(is.na(Inspector_Assigned), "Missing", Inspector_Assigned)) %>%
+     copy_to(sc, ., "chicago", overwrite=TRUE)
+```
+```{r}
+sumNAs<-function(x){sum(is.na(x))}
+ datdt %>%
+    collect %>%
+    summarise_each(funs(sumNAs)) %>%
+    t
+```
+
+```{r}
+datdt %>%
+    na.omit %>% 
+    mutate(criticalFound = pmin(1, criticalCount)) %>% 
+    transmute(
+        Inspector = Inspector_Assigned,
+                    pastSerious = pmin(pastSerious, 1),
+                    pastCritical = pmin(pastCritical, 1),
+                    timeSinceLast,
+                    ageAtInspection = ifelse(ageAtInspection > 4, 1L, 0L),
+                    consumption_on_premises_incidental_activity,
+                    tobacco_retail_over_counter,
+                    temperatureMax,
+                    heat_burglary = pmin(heat_burglary, 70),
+                    heat_sanitation = pmin(heat_sanitation, 70),
+                    heat_garbage = pmin(heat_garbage, 50),
+                    # Facility_Type,
+                    criticalFound
+    ) %>%
+    copy_to(sc,.,"ModelData")
+```
+
+```{r}
+modeldt<-
+```
+
