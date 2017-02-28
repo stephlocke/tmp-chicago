@@ -1,0 +1,51 @@
+---
+title: "Spark basics"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(sparklyr)
+library(dplyr)
+library(AppliedPredictiveModeling)
+#A hack for my stuff only *hopefully*
+Sys.setenv("HADOOP_HOME"="C:\\Users\\steph\\AppData\\Local\\rstudio\\spark\\Cache\\spark-2.1.0-bin-hadoop2.7\\tmp\\hadoop")
+sc <- spark_connect(master = "local")
+```
+
+```{r}
+data(abalone)
+summary(abalone)
+abalone_tbl <- copy_to(sc, abalone, "abalone", overwrite = TRUE)
+```
+
+```{r}
+abalone_tbl %>%
+  sdf_partition(training = 0.7, test = 0.3, seed = 888) ->
+  partitions
+```
+
+```{r}
+partitions$training %>%
+  ml_linear_regression(Rings ~ .) -> 
+  fit
+```
+
+```{r}
+summary(fit)
+```
+
+```{r}
+library(ggplot2)
+sdf_predict(fit, partitions$test) %>%
+  collect %>%
+  ggplot(aes(x = Rings, y = prediction)) +
+  geom_abline(lty = "dashed", col = "red") +
+  geom_jitter(alpha=.5) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  coord_fixed(ratio = 1) +
+  labs(
+    x = "Actual # Rings",
+    y = "Predicted #Rings",
+    title = "Predicted vs. Actual"
+  )
+```
